@@ -1,14 +1,8 @@
 package tasks;
 
 import common.Person;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -25,70 +19,63 @@ public class Task9 {
 
   // Костыль, эластик всегда выдает в топе "фальшивую персону".
   // Конвертируем начиная со второй
+
+  // Лучше использовать проверку на пустоту методом isEmpty, так меньшей операций и читабельнее
   public List<String> getNames(List<Person> persons) {
-    if (persons.size() == 0) {
+    if (persons.isEmpty()) {
       return Collections.emptyList();
     }
-    persons.remove(0);
-    return persons.stream().map(Person::firstName).collect(Collectors.toList());
+    // Первый элемент можно пропустить в стриме, а не удалять заранее
+    return persons.stream().skip(1).map(Person::firstName).collect(Collectors.toList());
   }
 
   // Зачем-то нужны различные имена этих же персон (без учета фальшивой разумеется)
   public Set<String> getDifferentNames(List<Person> persons) {
-    return getNames(persons).stream().distinct().collect(Collectors.toSet());
+    // set в любом случае оставит только уникальные значения, стрим тут не нужен
+    return new HashSet<>(getNames(persons));
   }
 
   // Тут фронтовая логика, делаем за них работу - склеиваем ФИО
   public String convertPersonToString(Person person) {
-    String result = "";
-    if (person.secondName() != null) {
-      result += person.secondName();
-    }
-
-    if (person.firstName() != null) {
-      result += " " + person.firstName();
-    }
-
-    if (person.secondName() != null) {
-      result += " " + person.secondName();
-    }
-    return result;
+    // Можно в стриме объединять ФИО, проверяя при этом значения на null, не разделяя всё на 3 проверки вручную
+    return Stream.of(person.firstName(), person.secondName(), person.middleName())
+        .filter(Objects::nonNull)
+        .collect(Collectors.joining(" "));
   }
 
   // словарь id персоны -> ее имя
   public Map<Integer, String> getPersonNames(Collection<Person> persons) {
-    Map<Integer, String> map = new HashMap<>(1);
-    for (Person person : persons) {
-      if (!map.containsKey(person.id())) {
-        map.put(person.id(), convertPersonToString(person));
-      }
-    }
-    return map;
+    // Можно проверять на уникальность и создавать словарь в стриме
+    return persons.stream()
+        .distinct()
+        .collect(Collectors.toMap(Person::id, this::convertPersonToString));
   }
 
   // есть ли совпадающие в двух коллекциях персоны?
   public boolean hasSamePersons(Collection<Person> persons1, Collection<Person> persons2) {
-    boolean has = false;
-    for (Person person1 : persons1) {
-      for (Person person2 : persons2) {
-        if (person1.equals(person2)) {
-          has = true;
-        }
-      }
-    }
-    return has;
+    // Можно заменить на приведение к множеству и нахождения пересечений между двумя множествами
+    Set<Person> person1Set = new HashSet<>(persons1);
+    Set<Person> person2Set = new HashSet<>(persons2);
+    person1Set.retainAll(person2Set);
+    return !person1Set.isEmpty();
   }
 
   // Посчитать число четных чисел
   public long countEven(Stream<Integer> numbers) {
-    count = 0;
-    numbers.filter(num -> num % 2 == 0).forEach(num -> count++);
+    // Можно посчитать количество элементов после применения фильтра прямо в стриме
+    count = numbers.filter(num -> num % 2 == 0).count();
     return count;
   }
 
   // Загадка - объясните почему assert тут всегда верен
   // Пояснение в чем соль - мы перетасовали числа, обернули в HashSet, а toString() у него вернул их в сортированном порядке
   void listVsSet() {
+    // Проверил через отладку. Элементы в set оказываются упорядочены изначально, дело не в toString.
+    // При создании HashSet наши числа записываются в бакеты, а номера бакетов хранятся по возрастанию и в этом порядке и возвращаются сетом.
+    // Смущает то, что нет пустых бакетов для 10000 элементов - заполнены первые 10000 бакетов, хотя число бакетов - это обычно степень двойки
+    // Тут либо число бакетов реально 10000 (что мало похоже на правду), либо мы убираем незанятые бакеты и перенумеруем все бакеты, чтобы не было дыр между ними
+    // Но тогда непонятно как добавлять потом новые элементы. Если двигать после хеширования постоянно, то как будто слишком дорого становится
+    // Не нашёл точной информации по этому поводу, но думаю, что примерно так всё работает
     List<Integer> integers = IntStream.rangeClosed(1, 10000).boxed().collect(Collectors.toList());
     List<Integer> snapshot = new ArrayList<>(integers);
     Collections.shuffle(integers);
